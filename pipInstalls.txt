@@ -1,0 +1,3 @@
+neat-python
+matplotlib
+graphviz
