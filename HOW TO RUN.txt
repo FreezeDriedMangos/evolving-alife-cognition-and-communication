@@ -1,0 +1,2 @@
+in the search bar, type "cmd", just like you'd type "bash" to open WSL
+then type "py Evolution.py"
