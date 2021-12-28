@@ -239,6 +239,10 @@ class Agent:
 				self.y = parent2.y + (random.random()-0.5)
 				self.rotation = parent2.rotation + (random.random()-0.5)
 		
+		self.p_x = self.x
+		self.p_y = self.y
+
+		
 	def create_input_vector(self, world):
 		input_vector = []
 

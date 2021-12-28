@@ -2,3 +2,4 @@ neat-python
 matplotlib
 graphviz
 pygame
+pymunk
