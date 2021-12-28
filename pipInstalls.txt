@@ -2,4 +2,3 @@ neat-python
 matplotlib
 graphviz
 pygame
-git+https://github.com/pvigier/perlin-numpy
