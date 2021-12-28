@@ -173,6 +173,7 @@ TOTAL_OUTPUT_COUNT = AGENT_OUTPUT_COUNT + RESERVED_OUTPUT_COUNT
 AGENT_STARTING_MAX_AGE = 100
 
 # constants
+AGENT_SPEED_SCALE = 0.1
 AGENT_MAX_SPEED = 5
 AGENT_MAX_BACKUP_SPEED = 1
 AGENT_MAX_VOLUME = 10
@@ -221,8 +222,8 @@ class Agent:
 		self.ears = [Ear(0.5, 0), Ear(-0.5, 0)]
 
 		if parent1 is None and parent2 is None:
-			self.x = 0
-			self.y = 0
+			self.x = random.random()*50
+			self.y = random.random()*50
 			self.rotation = 0
 		elif parent2 is None:
 			self.x = parent1.x + (random.random()-0.5)
@@ -273,9 +274,9 @@ class Agent:
 		brain_output = self.brain.evaluate(input_vector)
 
 		# act
-		self.rotation += brain_output[ACTION_TURN]
+		self.rotation += brain_output[ACTION_TURN] * AGENT_SPEED_SCALE
 
-		speed = max(brain_output[ACTION_MOVE], AGENT_MAX_BACKUP_SPEED/AGENT_MAX_SPEED) * AGENT_MAX_SPEED
+		speed = max(brain_output[ACTION_MOVE], AGENT_MAX_BACKUP_SPEED/AGENT_MAX_SPEED) * AGENT_MAX_SPEED * AGENT_SPEED_SCALE
 		self.x += math.cos(self.rotation) * speed
 		self.y += math.sin(self.rotation) * speed
 
