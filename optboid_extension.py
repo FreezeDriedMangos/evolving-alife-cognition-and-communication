@@ -17,6 +17,7 @@ class SmartBoid(optboid.Boid):
 	
 	_avoid_f = optboid.Vector2(0, 0)
 	_nearest_obstacle_distance = float('inf')
+	avoid_bounds = True
 
 	def interact(self, actors):
 		"""
@@ -125,7 +126,26 @@ class SmartBoid(optboid.Boid):
 						self._avoid_f = ahead - other.position
 
 					average_obstacle_position += other.position
+
+		# count the bounds of the world as obstacles
+		# I'm subtracting self.velocity*0.3 to smooth their reaction to the bounds a bit
+		if self.avoid_bounds:
+			if self.position.x <= self.influence_range:
+				average_obstacle_position += optboid.Vector2(0, self.position.y) - self.velocity*0.3
+				count += 1
+			if self.position.x >= world_size-self.influence_range:
+				average_obstacle_position += optboid.Vector2(world_size, self.position.y) - self.velocity*0.3
+				count += 1
+			
+			if self.position.y <= self.influence_range:
+				average_obstacle_position += optboid.Vector2(self.position.x, 0) - self.velocity*0.3
+				count += 1
+			if self.position.y >= world_size-self.influence_range:
+				average_obstacle_position += optboid.Vector2(self.position.x, world_size) - self.velocity*0.3
+				count += 1
 		
+
+
 		if count > 0:
 			# calc the avoidance force
 			average_obstacle_position /= count
@@ -135,7 +155,7 @@ class SmartBoid(optboid.Boid):
 			self._avoid_f -= self.velocity
 			# optboid.limit(self._avoid_f, self.max_force)
 
-			self.acceleration = self._avoid_f
+			self.acceleration = self._avoid_f #/ ((self.position-average_obstacle_position).magnitude() ** 0.001)
 
 	
 	def update(self, t):
@@ -152,6 +172,7 @@ class SmartBoid(optboid.Boid):
 		self.position += self.velocity * t
 
 		
+world_size = 100
 class FlockAndObstacleSimulation(optboid.FlockSimulation):
 	def __init__(self, starting_units=100, field_size=800, starting_obstacles=50):
 		"""
@@ -170,3 +191,6 @@ class FlockAndObstacleSimulation(optboid.FlockSimulation):
 			self.swarm.boids.append(b)
 		self.swarm.rebuild()
 		self._cumltime = 0  # calculation var
+
+		global world_size
+		world_size = field_size
