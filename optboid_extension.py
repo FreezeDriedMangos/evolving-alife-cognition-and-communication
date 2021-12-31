@@ -26,14 +26,12 @@ class SmartBoid(optboid.Boid):
 		Many examples separate these into different functions for clarity
 		but combining them means we need fewer loops over the neibor list
 		"""
+		self.actors = actors # hacky, I'm not a fan
 
 		self._sep_f.clear()
 		self._align_f.clear()
 		self._cohes_sum.clear()
-		self._avoid_f.clear()
-		self._nearest_obstacle_distance = float('inf')
 
-		obstacle_count = 0
 		count = 0
 		self.neighbors = len(actors)
 
@@ -60,16 +58,6 @@ class SmartBoid(optboid.Boid):
 
 					# Align - add the velocity of the neighbouring actors, then average
 					self._align_f += other.velocity
-				elif isinstance(other, BoidObstacle):
-					obstacle_count += 1
-					distance = (self.position - other.position).magnitude()
-
-					if distance < self._nearest_obstacle_distance:
-						self._nearest_obstacle_distance = distance
-
-						ahead = self.position + self.velocity
-						# self._avoid_f = ahead - other.position
-						self._avoid_f += other.position
 
 
 		if count > 0:
@@ -95,20 +83,75 @@ class SmartBoid(optboid.Boid):
 			self._align_f *= self.align_strength
 			cohesion_f *= self.cohesion_strength
 
-			# calc the avoidance force
-			self._avoid_f /= obstacle_count if obstacle_count > 0 else 1
-			self._avoid_f = self.position + (self._sep_f + cohesion_f + self._align_f) - other.position
-			self._avoid_f.normalize()
-			self._avoid_f *= self.max_speed
-			self._avoid_f -= self.velocity
-			optboid.limit(self._avoid_f, self.max_force*2)
 
 			# finally add the velocities
-			sum = self._sep_f + cohesion_f + self._align_f + self._avoid_f
+			sum = self._sep_f + cohesion_f + self._align_f
 
 			self.acceleration = sum
 
+	def avoid_obstacles(self, obstacles):
+		ahead = self.position + self.velocity
 
+		self._avoid_f.clear()
+		self._nearest_obstacle_distance = float('inf')
+
+		average_obstacle_position = optboid.Vector2(0, 0)
+
+		count = 0
+		for other in obstacles:
+			# vector pointing from neighbors to self
+			diff = self.position - other.position
+			d = abs(diff)
+
+			# Only perform on "neighbor" actors, i.e. ones closer than arbitrary
+			# dist or if the distance is not 0 (you are yourself)
+			if 0 < d < self.influence_range:
+
+				diff.normalize()
+				if d < self.minsep:
+#                    diff *= self.max_force
+#                else:
+					diff /= d  # Weight by distance
+
+				if isinstance(other, BoidObstacle):
+					count += 1
+
+					distance = (self.position - other.position).magnitude()
+					
+					if distance < self._nearest_obstacle_distance:
+						self._nearest_obstacle_distance = distance
+
+						ahead = self.position + self.velocity
+						self._avoid_f = ahead - other.position
+
+					average_obstacle_position += other.position
+		
+		if count > 0:
+			# calc the avoidance force
+			average_obstacle_position /= count
+			self._avoid_f = self.position + self.velocity - average_obstacle_position
+			# self._avoid_f.normalize()
+			# self._avoid_f *= self.max_speed
+			self._avoid_f -= self.velocity
+			# optboid.limit(self._avoid_f, self.max_force)
+
+			self.acceleration = self._avoid_f
+
+	
+	def update(self, t):
+		"""
+		Method to update position by computing displacement from velocity and acceleration
+		"""
+		self.velocity += self.acceleration * t
+		optboid.limit(self.velocity, self.max_speed)
+		
+		self.avoid_obstacles([boid for boid in self.actors if isinstance(boid, BoidObstacle)])
+		self.velocity += self.acceleration * t
+		optboid.limit(self.velocity, self.max_speed)
+
+		self.position += self.velocity * t
+
+		
 class FlockAndObstacleSimulation(optboid.FlockSimulation):
 	def __init__(self, starting_units=100, field_size=800, starting_obstacles=50):
 		"""
