@@ -19,6 +19,9 @@ class SmartBoid(optboid.Boid):
 	_nearest_obstacle_distance = float('inf')
 	avoid_bounds = True
 
+	_avoid_sum = optboid.Vector2(0, 0)
+	avoid_strength = 10.0
+
 	def interact(self, actors):
 		"""
 		Unit-unit interaction method, combining a separation force, and velocity
@@ -27,13 +30,15 @@ class SmartBoid(optboid.Boid):
 		Many examples separate these into different functions for clarity
 		but combining them means we need fewer loops over the neibor list
 		"""
-		self.actors = actors # hacky, I'm not a fan
+		# self.actors = actors # hacky, I'm not a fan
 
 		self._sep_f.clear()
 		self._align_f.clear()
 		self._cohes_sum.clear()
+		self._avoid_sum.clear()
 
 		count = 0
+		obstacle_count = 0
 		self.neighbors = len(actors)
 
 		for other in actors:
@@ -59,6 +64,9 @@ class SmartBoid(optboid.Boid):
 
 					# Align - add the velocity of the neighbouring actors, then average
 					self._align_f += other.velocity
+				else:
+					obstacle_count += 1
+					self._avoid_sum += other.position
 
 
 		if count > 0:
@@ -90,72 +98,81 @@ class SmartBoid(optboid.Boid):
 
 			self.acceleration = sum
 
-	def avoid_obstacles(self, obstacles):
-		ahead = self.position + self.velocity
+		if obstacle_count > 0:
+			self._avoid_sum /= obstacle_count
+			avoid_f = -self.steer(self._avoid_sum, True)
 
-		self._avoid_f.clear()
-		self._nearest_obstacle_distance = float('inf')
+			avoid_f *= self.avoid_strength
 
-		average_obstacle_position = optboid.Vector2(0, 0)
+			self.acceleration += avoid_f
 
-		count = 0
-		for other in obstacles:
-			# vector pointing from neighbors to self
-			diff = self.position - other.position
-			d = abs(diff)
 
-			# Only perform on "neighbor" actors, i.e. ones closer than arbitrary
-			# dist or if the distance is not 0 (you are yourself)
-			if 0 < d < self.influence_range:
+# 	def avoid_obstacles(self, obstacles):
+# 		ahead = self.position + self.velocity
 
-				diff.normalize()
-				if d < self.minsep:
-#                    diff *= self.max_force
-#                else:
-					diff /= d  # Weight by distance
+# 		self._avoid_f.clear()
+# 		self._nearest_obstacle_distance = float('inf')
 
-				if isinstance(other, BoidObstacle):
-					count += 1
+# 		average_obstacle_position = optboid.Vector2(0, 0)
 
-					distance = (self.position - other.position).magnitude()
+# 		count = 0
+# 		for other in obstacles:
+# 			# vector pointing from neighbors to self
+# 			diff = self.position - other.position
+# 			d = abs(diff)
+
+# 			# Only perform on "neighbor" actors, i.e. ones closer than arbitrary
+# 			# dist or if the distance is not 0 (you are yourself)
+# 			if 0 < d < self.influence_range:
+
+# 				diff.normalize()
+# 				if d < self.minsep:
+# #                    diff *= self.max_force
+# #                else:
+# 					diff /= d  # Weight by distance
+
+# 				if isinstance(other, BoidObstacle):
+# 					count += 1
+
+# 					distance = (self.position - other.position).magnitude()
 					
-					if distance < self._nearest_obstacle_distance:
-						self._nearest_obstacle_distance = distance
+# 					if distance < self._nearest_obstacle_distance:
+# 						self._nearest_obstacle_distance = distance
 
-						ahead = self.position + self.velocity
-						self._avoid_f = ahead - other.position
+# 						ahead = self.position + self.velocity
+# 						self._avoid_f = ahead - other.position
 
-					average_obstacle_position += other.position
+# 					average_obstacle_position += other.position
 
-		# count the bounds of the world as obstacles
-		# I'm subtracting self.velocity*0.3 to smooth their reaction to the bounds a bit
-		if self.avoid_bounds:
-			if self.position.x <= self.influence_range:
-				average_obstacle_position += optboid.Vector2(0, self.position.y) - self.velocity*0.3
-				count += 1
-			if self.position.x >= world_size-self.influence_range:
-				average_obstacle_position += optboid.Vector2(world_size, self.position.y) - self.velocity*0.3
-				count += 1
+# 		# count the bounds of the world as obstacles
+# 		# I'm subtracting self.velocity*0.3 to smooth their reaction to the bounds a bit
+# 		if self.avoid_bounds:
+# 			if self.position.x <= self.influence_range:
+# 				average_obstacle_position += optboid.Vector2(0, self.position.y) - self.velocity*0.3
+# 				count += 1
+# 			if self.position.x >= world_size-self.influence_range:
+# 				average_obstacle_position += optboid.Vector2(world_size, self.position.y) - self.velocity*0.3
+# 				count += 1
 			
-			if self.position.y <= self.influence_range:
-				average_obstacle_position += optboid.Vector2(self.position.x, 0) - self.velocity*0.3
-				count += 1
-			if self.position.y >= world_size-self.influence_range:
-				average_obstacle_position += optboid.Vector2(self.position.x, world_size) - self.velocity*0.3
-				count += 1
+# 			if self.position.y <= self.influence_range:
+# 				average_obstacle_position += optboid.Vector2(self.position.x, 0) - self.velocity*0.3
+# 				count += 1
+# 			if self.position.y >= world_size-self.influence_range:
+# 				average_obstacle_position += optboid.Vector2(self.position.x, world_size) - self.velocity*0.3
+# 				count += 1
 		
 
 
-		if count > 0:
-			# calc the avoidance force
-			average_obstacle_position /= count
-			self._avoid_f = self.position + self.velocity - average_obstacle_position
-			# self._avoid_f.normalize()
-			# self._avoid_f *= self.max_speed
-			self._avoid_f -= self.velocity
-			# optboid.limit(self._avoid_f, self.max_force)
+# 		if count > 0:
+# 			# calc the avoidance force
+# 			average_obstacle_position /= count
+# 			self._avoid_f = self.position + self.velocity - average_obstacle_position
+# 			# self._avoid_f.normalize()
+# 			# self._avoid_f *= self.max_speed
+# 			self._avoid_f -= self.velocity
+# 			# optboid.limit(self._avoid_f, self.max_force)
 
-			self.acceleration = self._avoid_f #/ ((self.position-average_obstacle_position).magnitude() ** 0.001)
+# 			self.acceleration = self._avoid_f #/ ((self.position-average_obstacle_position).magnitude() ** 0.001)
 
 	
 	def update(self, t):
@@ -165,9 +182,9 @@ class SmartBoid(optboid.Boid):
 		self.velocity += self.acceleration * t
 		optboid.limit(self.velocity, self.max_speed)
 		
-		self.avoid_obstacles([boid for boid in self.actors if isinstance(boid, BoidObstacle)])
-		self.velocity += self.acceleration * t
-		optboid.limit(self.velocity, self.max_speed)
+		# self.avoid_obstacles([boid for boid in self.actors if isinstance(boid, BoidObstacle)])
+		# self.velocity += self.acceleration * t
+		# optboid.limit(self.velocity, self.max_speed)
 
 		self.position += self.velocity * t
 
