@@ -1,13 +1,18 @@
 #!/usr/bin/env python
+
+#
+# This file written by Clay
+#
+
 """
-A simple pyglet engine to do some 2D rendering.
-Used to display boids at given positions
+A simple pygame engine to do some 2D rendering.
+Used to display boids and obstacles at given positions
 """
 from __future__ import division, print_function, absolute_import, unicode_literals
 
 import pygame
 from math import *
-import simulation
+import optboid_extension
 
 class DummyObject:
 	pass
@@ -50,7 +55,8 @@ class World(object):
 		rotated_boid_points = [rotate_vector(p, e.rotation-pi/2) for p in scaled_boid_points]
 		boid_points = [(p[0] + e.position.x + self.o_x, p[1] + e.position.y + self.o_y) for p in rotated_boid_points]
 
-		pygame.draw.polygon(self.screen, (0, 0, 0), boid_points)
+		color = (0, 0, 0) if not isinstance(e, optboid_extension.BoidObstacle) else (100, 0, 0)
+		pygame.draw.polygon(self.screen, color, boid_points)
 
 
 	# def draw_grid(self):
@@ -80,7 +86,7 @@ class World(object):
 		for ent in self.ents:
 			self.draw_entity(ent)
 
-sim = simulation.FlockSimulation(150, 750)
+sim = optboid_extension.FlockAndObstacleSimulation(150, 750, 10)
 world = World(sim.swarm, -25, -25)
 
 # window = pyglet.window.Window(700, 700, vsync=False)
