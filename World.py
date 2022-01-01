@@ -44,9 +44,10 @@ class World:
 		self.wall_size = 0.5
 		self.walls = [[None for x in range(0, math.ceil(self.world_max_x/self.wall_size))] for y in range(0, math.ceil(self.world_max_y/self.wall_size))]
 		
-		# # Set up physics
-		# self.wall_bodies = [[None for x in range(0, math.ceil(self.world_max_x/self.wall_size))] for y in range(0, math.ceil(self.world_max_y/self.wall_size))]
-		# self.other_bodies = dict()
+		# Set up physics
+		self.wall_bodies = [[None for x in range(0, math.ceil(self.world_max_x/self.wall_size))] for y in range(0, math.ceil(self.world_max_y/self.wall_size))]
+		self.other_bodies = dict()
+		# Physics
 
 		self.num_gens_of_unique_walls = 20
 		self.noise = perlin_numpy.generate_perlin_noise_3d((math.ceil(self.world_max_x/self.wall_size), math.ceil(self.world_max_y/self.wall_size), self.num_gens_of_unique_walls), (2, 2, 1), tileable=(False, False, True))
@@ -60,63 +61,66 @@ class World:
 		self.noise = normalized(self.noise, axis=1, order=3)
 		self.noise = normalized(self.noise, axis=2, order=3)
 
-		# # Set up physics
-		# self.space = pymunk.Space()
-		# self.space.gravity = 0,0
-		# pymunk.Poly(self.space.static_body, [(0,-10),(0,0),(self.world_max_x,0), (self.world_max_x,-10)])
-		# pymunk.Poly(self.space.static_body, [(0,self.world_max_y+10),(0,self.world_max_y+0),(self.world_max_x,self.world_max_y+0), (self.world_max_x,self.world_max_y+10)])
-		# pymunk.Poly(self.space.static_body, [(self.world_max_x+10,0),(self.world_max_x+0,0),(self.world_max_x+0,self.world_max_y), (self.world_max_x+10,self.world_max_y)])
-		# pymunk.Poly(self.space.static_body, [(-10,0),(0,0),(0,self.world_max_y), (-10,self.world_max_y)])
-		
+		# Set up physics
+		self.space = pymunk.Space()
+		self.space.gravity = 0,0
+		pymunk.Poly(self.space.static_body, [(0,-10),(0,0),(self.world_max_x,0), (self.world_max_x,-10)])
+		pymunk.Poly(self.space.static_body, [(0,self.world_max_y+10),(0,self.world_max_y+0),(self.world_max_x,self.world_max_y+0), (self.world_max_x,self.world_max_y+10)])
+		pymunk.Poly(self.space.static_body, [(self.world_max_x+10,0),(self.world_max_x+0,0),(self.world_max_x+0,self.world_max_y), (self.world_max_x+10,self.world_max_y)])
+		pymunk.Poly(self.space.static_body, [(-10,0),(0,0),(0,self.world_max_y), (-10,self.world_max_y)])
+		# physics
 
 		self.update_walls(0)
 
 	def update_walls(self, time):
-		# # Physics objects
-		# for y in range(0, math.ceil(self.world_max_y/self.wall_size)):
-		# 	for x in range(0, math.ceil(self.world_max_x/self.wall_size)):
-		# 		if self.wall_bodies[x][y]:
-		# 			self.space.remove(self.wall_bodies[x][y])
-		# 			self.wall_bodies[x][y] = None
+		# Physics objects
+		for y in range(0, math.ceil(self.world_max_y/self.wall_size)):
+			for x in range(0, math.ceil(self.world_max_x/self.wall_size)):
+				if self.wall_bodies[x][y]:
+					self.space.remove(self.wall_bodies[x][y])
+					self.wall_bodies[x][y] = None
+		# physics
 
 		time = (time//1) % self.num_gens_of_unique_walls
 		self.walls = [[self.noise[x, y, time]+0.5 > 0.8 for x in range(0, math.ceil(self.world_max_x/self.wall_size))] for y in range(0, math.ceil(self.world_max_y/self.wall_size))]
 		
-		# # Physics objects
-		# self.wall_bodies = [
-		# 	[ 
-		# 		pymunk.Poly(self.space.static_body, [(x,y),(x+self.wall_size,y),(x+self.wall_size,y+self.wall_size),(x,y+self.wall_size)]) if self.walls[x][y] else None
-		# 		for x in range(0, math.ceil(self.world_max_x/self.wall_size))
-		# 	] 
-		# 	for y in range(0, math.ceil(self.world_max_y/self.wall_size))
-		# ]
+		# Physics objects
+		self.wall_bodies = [
+			[ 
+				pymunk.Poly(self.space.static_body, [(x,y),(x+self.wall_size,y),(x+self.wall_size,y+self.wall_size),(x,y+self.wall_size)]) if self.walls[x][y] else None
+				for x in range(0, math.ceil(self.world_max_x/self.wall_size))
+			] 
+			for y in range(0, math.ceil(self.world_max_y/self.wall_size))
+		]
 		
-		# for y in range(0, math.ceil(self.world_max_y/self.wall_size)):
-		# 	for x in range(0, math.ceil(self.world_max_x/self.wall_size)):
-		# 		if self.wall_bodies[x][y]:
-		# 			self.space.add(self.wall_bodies[x][y])
-
+		for y in range(0, math.ceil(self.world_max_y/self.wall_size)):
+			for x in range(0, math.ceil(self.world_max_x/self.wall_size)):
+				if self.wall_bodies[x][y]:
+					self.space.add(self.wall_bodies[x][y])
+		# physics
 
 	def init_agents(self, agents):
 
-		# # Physics
-		# for _,body in self.other_bodies.items():
-		# 	self.space.remove(body)
-		# self.other_bodies = dict()
+		# Physics
+		for _,body in self.other_bodies.items():
+			self.space.remove(body)
+		self.other_bodies = dict()
+		# physics
 
 		self.agents = agents
 		
-		# # Physics
-		# for agent in agents:
-		# 	mass = 10
-		# 	radius = agent_lib.AGENT_RADIUS
-		# 	inertia = pymunk.moment_for_circle(mass, 0, radius, (0, 0))
-		# 	body = pymunk.Body(mass, inertia, body_type=pymunk.Body.DYNAMIC)
-		# 	body.position = agent.x, agent.y
-		# 	shape = pymunk.Circle(body, radius, pymunk.Vec2d(0, 0))
-		# 	self.space.add(body, shape)
+		# Physics
+		for agent in agents:
+			mass = 10
+			radius = agent_lib.AGENT_RADIUS
+			inertia = pymunk.moment_for_circle(mass, 0, radius, (0, 0))
+			body = pymunk.Body(mass, inertia, body_type=pymunk.Body.DYNAMIC)
+			body.position = agent.x, agent.y
+			shape = pymunk.Circle(body, radius, pymunk.Vec2d(0, 0))
+			self.space.add(body, shape)
 
-		# 	self.other_bodies[agent] = shape
+			self.other_bodies[agent] = shape
+		# physics
 
 
 	def iteration(self):
@@ -132,35 +136,36 @@ class World:
 			wave.radius += SPEED_OF_SOUND
 
 		for agent in self.agents:
-			# agent.evaluate(self)
-			# 
-			# # Physics
-			# body = self.other_bodies[agent].body
-			# movement_vector = agent.x - agent.p_x, agent.y - agent.p_y 
-			# body.apply_force_at_local_point(movement_vector)
-			# body.velocity = body.velocity.normalized() * agent_lib.AGENT_MAX_SPEED if abs(body.velocity) > agent_lib.AGENT_MAX_SPEED else body.velocity
-			
-			agent.p_x = agent.x
-			agent.p_y = agent.y
-
 			agent.evaluate(self)
 			
-			agent.x = max(self.world_min_x, min(agent.x, self.world_max_x))
-			agent.y = max(self.world_min_y, min(agent.y, self.world_max_y))
+			# Physics
+			body = self.other_bodies[agent].body
+			movement_vector = agent.x - agent.p_x, agent.y - agent.p_y 
+			body.apply_force_at_local_point(movement_vector)
+			body.velocity = body.velocity.normalized() * agent_lib.AGENT_MAX_SPEED if abs(body.velocity) > agent_lib.AGENT_MAX_SPEED else body.velocity
+			# physics
+
+			# agent.p_x = agent.x
+			# agent.p_y = agent.y
+
+			# agent.evaluate(self)
+			
+			# agent.x = max(self.world_min_x, min(agent.x, self.world_max_x))
+			# agent.y = max(self.world_min_y, min(agent.y, self.world_max_y))
 		
-		# # Physics
-		# self.space.step(1)
-		# 
-		# for agent in self.agents:
-		# 	position = self.other_bodies[agent].body.position
+		# Physics
+		self.space.step(1)
+		
+		for agent in self.agents:
+			position = self.other_bodies[agent].body.position
 
-		# 	agent.x = position.x
-		# 	agent.y = position.y
-		# 	# agent.x = max(self.world_min_x, min(agent.x, self.world_max_x))
-		# 	# agent.y = max(self.world_min_y, min(agent.y, self.world_max_y))
+			agent.x = position.x
+			agent.y = position.y
+			# agent.x = max(self.world_min_x, min(agent.x, self.world_max_x))
+			# agent.y = max(self.world_min_y, min(agent.y, self.world_max_y))
 
-		# 	agent.p_x = agent.x
-		# 	agent.p_y = agent.y
+			agent.p_x = agent.x
+			agent.p_y = agent.y
 
 
 
