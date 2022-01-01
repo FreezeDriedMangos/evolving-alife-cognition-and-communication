@@ -69,6 +69,24 @@ class SmartBoid(optboid.Boid):
 					self._avoid_sum += other.position
 
 
+		# count the bounds of the world as obstacles
+		# I'm subtracting self.velocity*0.3 to smooth their reaction to the bounds a bit
+		if self.avoid_bounds:
+			if self.position.x <= self.influence_range:
+				self._avoid_sum += optboid.Vector2(0, self.position.y) - self.velocity*0.3
+				obstacle_count += 1
+			if self.position.x >= world_size-self.influence_range:
+				self._avoid_sum += optboid.Vector2(world_size, self.position.y) - self.velocity*0.3
+				obstacle_count += 1
+			
+			if self.position.y <= self.influence_range:
+				self._avoid_sum += optboid.Vector2(self.position.x, 0) - self.velocity*0.3
+				obstacle_count += 1
+			if self.position.y >= world_size-self.influence_range:
+				self._avoid_sum += optboid.Vector2(self.position.x, world_size) - self.velocity*0.3
+				obstacle_count += 1
+		
+
 		if count > 0:
 			# calc the average of the separation vector
 			# self._sep_f /=count don't div by count if normalizing anyway!
@@ -187,6 +205,7 @@ class SmartBoid(optboid.Boid):
 		# optboid.limit(self.velocity, self.max_speed)
 
 		self.position += self.velocity * t
+
 
 		
 world_size = 100
