@@ -15,7 +15,7 @@ import math
 #   -=%#
 # -=%#
 
-
+has_made_plot = False
 
 
 
@@ -60,3 +60,24 @@ def draw(world):
 		if event.type == pygame.QUIT:
 			pygame.quit()
 			sys.exit(0)
+
+
+	# global has_made_plot
+	# if not has_made_plot:
+	# 	has_made_plot = True
+
+	# 	import matplotlib.pyplot as plt
+
+	# 	import pymunk
+	# 	import pymunk.matplotlib_util
+	# 	from pymunk.vec2d import Vec2d
+
+	# 	space = world.space
+
+	# 	fig = plt.figure(figsize=(14, 10))
+	# 	ax = plt.axes(xlim=(0, 150), ylim=(0, 150))
+	# 	ax.set_aspect("equal")
+	# 	o = pymunk.matplotlib_util.DrawOptions(ax)
+	# 	space.debug_draw(o)
+
+	# 	fig.savefig("matplotlib_util_demo.png", bbox_inches="tight")
