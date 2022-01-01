@@ -1,3 +1,6 @@
+# TODO: switch to https://github.com/pybox2d/pybox2d ?
+
+
 import pymunk
 import math
 import random
@@ -64,10 +67,25 @@ class World:
 		# Set up physics
 		self.space = pymunk.Space()
 		self.space.gravity = 0,0
-		pymunk.Poly(self.space.static_body, [(0,-10),(0,0),(self.world_max_x,0), (self.world_max_x,-10)])
-		pymunk.Poly(self.space.static_body, [(0,self.world_max_y+10),(0,self.world_max_y+0),(self.world_max_x,self.world_max_y+0), (self.world_max_x,self.world_max_y+10)])
-		pymunk.Poly(self.space.static_body, [(self.world_max_x+10,0),(self.world_max_x+0,0),(self.world_max_x+0,self.world_max_y), (self.world_max_x+10,self.world_max_y)])
-		pymunk.Poly(self.space.static_body, [(-10,0),(0,0),(0,self.world_max_y), (-10,self.world_max_y)])
+		top = pymunk.Poly(self.space.static_body, [(0,-10),(0,0),(self.world_max_x,0), (self.world_max_x,-10)])
+		bottom = pymunk.Poly(self.space.static_body, [(0,self.world_max_y+10),(0,self.world_max_y+0),(self.world_max_x,self.world_max_y+0), (self.world_max_x,self.world_max_y+10)])
+		right = pymunk.Poly(self.space.static_body, [(self.world_max_x+10,0),(self.world_max_x+0,0),(self.world_max_x+0,self.world_max_y), (self.world_max_x+10,self.world_max_y)])
+		left = pymunk.Poly(self.space.static_body, [(-10,0),(0,0),(0,self.world_max_y), (-10,self.world_max_y)])
+
+		top.collision_type = 0
+		bottom.collision_type = 0
+		right.collision_type = 0
+		left.collision_type = 0
+		self.space.add(top)
+		self.space.add(bottom)
+		self.space.add(right)
+		self.space.add(left)
+
+		def collision(arbiter, space, data):
+			print('collision!')
+			return True
+		h = self.space.add_collision_handler(0, 0)
+		h.begin = collision
 		# physics
 
 		self.update_walls(0)
@@ -85,9 +103,16 @@ class World:
 		self.walls = [[self.noise[x, y, time]+0.5 > 0.8 for x in range(0, math.ceil(self.world_max_x/self.wall_size))] for y in range(0, math.ceil(self.world_max_y/self.wall_size))]
 		
 		# Physics objects
+		def make_wall_shape(x, y):
+			if not self.walls[x][y]:
+				return None
+
+			shape = pymunk.Poly(self.space.static_body, [(x,y),(x+self.wall_size,y),(x+self.wall_size,y+self.wall_size),(x,y+self.wall_size)])
+			shape.collision_type = 0
+			return shape
 		self.wall_bodies = [
 			[ 
-				pymunk.Poly(self.space.static_body, [(x,y),(x+self.wall_size,y),(x+self.wall_size,y+self.wall_size),(x,y+self.wall_size)]) if self.walls[x][y] else None
+				make_wall_shape(x,y)
 				for x in range(0, math.ceil(self.world_max_x/self.wall_size))
 			] 
 			for y in range(0, math.ceil(self.world_max_y/self.wall_size))
@@ -117,6 +142,7 @@ class World:
 			body = pymunk.Body(mass, inertia, body_type=pymunk.Body.DYNAMIC)
 			body.position = agent.x, agent.y
 			shape = pymunk.Circle(body, radius, pymunk.Vec2d(0, 0))
+			shape.collision_type = 0
 			self.space.add(body, shape)
 
 			self.other_bodies[agent] = shape
@@ -172,6 +198,7 @@ class World:
 
 	def make_sound(self, x, y, volume):
 		self.sound_waves.append(SoundWave(x, y, 0, volume))
+
 
 	def hear(self, x, y):
 		s = 0
