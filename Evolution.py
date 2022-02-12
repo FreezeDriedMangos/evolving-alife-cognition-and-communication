@@ -51,7 +51,7 @@ def eval_genomes(genomes, config):
 
     for genome_id, genome in genomes:
         genome.fitness = 0
-        net = neat.nn.recurrent.RecurrentNetwork.create(genome, config)
+        net = neat.nn.recurrent.RecurrentNetwork.create(genome, config) # TODO: in order to generate LSTMs instead, just do LSTM.create(genome, config)
         agent = Agent.Agent(net, *[parent[2] for parent in parents if parent[0] in p.reproduction.ancestors[genome_id]])
 
         cur_gen.append((genome_id, genome, agent))
@@ -78,6 +78,7 @@ def eval_genomes(genomes, config):
 
 def run(config_file):
     # Load configuration.
+    # TODO: to enable LSTM evolution, replace neat.DefaultGenome with LSTMGenome
     config = neat.Config(neat.DefaultGenome, neat.DefaultReproduction,
                          neat.DefaultSpeciesSet, neat.DefaultStagnation,
                          config_file)

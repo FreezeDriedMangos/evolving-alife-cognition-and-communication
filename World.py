@@ -1,5 +1,7 @@
 # TODO: switch to https://github.com/pybox2d/pybox2d ?
 
+# with pymunk, looks like collisions are occuring, but nothing's being done when they do happen
+
 
 import pymunk
 import math
