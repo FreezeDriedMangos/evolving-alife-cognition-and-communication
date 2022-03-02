@@ -3,13 +3,13 @@
 # with pymunk, looks like collisions are occuring, but nothing's being done when they do happen
 
 
-import pymunk
 import math
 import random
 
 import libraries.perlin_numpy as perlin_numpy
 
 import Agent as agent_lib
+import QuadTree
 
 class SoundWave:
 	def __init__(self, origin_x, origin_y, radius, original_volume):
@@ -66,90 +66,26 @@ class World:
 		self.noise = normalized(self.noise, axis=1, order=3)
 		self.noise = normalized(self.noise, axis=2, order=3)
 
-		# Set up physics
-		self.space = pymunk.Space()
-		self.space.gravity = 0,0
-		top = pymunk.Poly(self.space.static_body, [(0,-10),(0,0),(self.world_max_x,0), (self.world_max_x,-10)])
-		bottom = pymunk.Poly(self.space.static_body, [(0,self.world_max_y+10),(0,self.world_max_y+0),(self.world_max_x,self.world_max_y+0), (self.world_max_x,self.world_max_y+10)])
-		right = pymunk.Poly(self.space.static_body, [(self.world_max_x+10,0),(self.world_max_x+0,0),(self.world_max_x+0,self.world_max_y), (self.world_max_x+10,self.world_max_y)])
-		left = pymunk.Poly(self.space.static_body, [(-10,0),(0,0),(0,self.world_max_y), (-10,self.world_max_y)])
-
-		top.collision_type = 0
-		bottom.collision_type = 0
-		right.collision_type = 0
-		left.collision_type = 0
-		self.space.add(top)
-		self.space.add(bottom)
-		self.space.add(right)
-		self.space.add(left)
-
-		def collision(arbiter, space, data):
-			print('collision!')
-			return True
-		h = self.space.add_collision_handler(0, 0)
-		h.begin = collision
-		# physics
+		self.quadtree = QuadTree.QuadTree(self.world_max_x-self.world_min_x, self.world_max_y-self.world_min_y)
 
 		self.update_walls(0)
 
 	def update_walls(self, time):
-		# Physics objects
-		for y in range(0, math.ceil(self.world_max_y/self.wall_size)):
-			for x in range(0, math.ceil(self.world_max_x/self.wall_size)):
-				if self.wall_bodies[x][y]:
-					self.space.remove(self.wall_bodies[x][y])
-					self.wall_bodies[x][y] = None
-		# physics
 
 		time = (time//1) % self.num_gens_of_unique_walls
 		self.walls = [[self.noise[x, y, time]+0.5 > 0.8 for x in range(0, math.ceil(self.world_max_x/self.wall_size))] for y in range(0, math.ceil(self.world_max_y/self.wall_size))]
 		
-		# Physics objects
-		def make_wall_shape(x, y):
-			if not self.walls[x][y]:
-				return None
-
-			shape = pymunk.Poly(self.space.static_body, [(x,y),(x+self.wall_size,y),(x+self.wall_size,y+self.wall_size),(x,y+self.wall_size)])
-			shape.collision_type = 0
-			return shape
-		self.wall_bodies = [
-			[ 
-				make_wall_shape(x,y)
-				for x in range(0, math.ceil(self.world_max_x/self.wall_size))
-			] 
-			for y in range(0, math.ceil(self.world_max_y/self.wall_size))
-		]
-		
-		for y in range(0, math.ceil(self.world_max_y/self.wall_size)):
-			for x in range(0, math.ceil(self.world_max_x/self.wall_size)):
-				if self.wall_bodies[x][y]:
-					self.space.add(self.wall_bodies[x][y])
-		# physics
 
 	def init_agents(self, agents):
-
-		# Physics
-		for _,body in self.other_bodies.items():
-			self.space.remove(body)
-		self.other_bodies = dict()
-		# physics
-
 		self.agents = agents
+		self.quadtree = QuadTree.QuadTree(self.world_max_x-self.world_min_x, self.world_max_y-self.world_min_y)
 		
-		# Physics
 		for agent in agents:
-			mass = 10
-			radius = agent_lib.AGENT_RADIUS
-			inertia = pymunk.moment_for_circle(mass, 0, radius, (0, 0))
-			body = pymunk.Body(mass, inertia, body_type=pymunk.Body.DYNAMIC)
-			body.position = agent.x, agent.y
-			shape = pymunk.Circle(body, radius, pymunk.Vec2d(0, 0))
-			shape.collision_type = 0
-			self.space.add(body, shape)
-
-			self.other_bodies[agent] = shape
-		# physics
-
+			circle = QuadTree.Circle(QuadTree.Point(agent.x, agent.y), agent_lib.AGENT_RADIUS)
+			circle.agent = agent
+			agent.circle = circle
+			self.quadtree.add(circle)
+		
 
 	def iteration(self):
 		# I'm not using pygame.Clock.tick() because I don't care about syncing physics with framerate or real-life time in general
@@ -165,35 +101,31 @@ class World:
 
 		for agent in self.agents:
 			agent.evaluate(self)
-			
-			# Physics
-			body = self.other_bodies[agent].body
-			movement_vector = agent.x - agent.p_x, agent.y - agent.p_y 
-			body.apply_force_at_local_point(movement_vector)
-			body.velocity = body.velocity.normalized() * agent_lib.AGENT_MAX_SPEED if abs(body.velocity) > agent_lib.AGENT_MAX_SPEED else body.velocity
-			# physics
-
-			# agent.p_x = agent.x
-			# agent.p_y = agent.y
-
-			# agent.evaluate(self)
-			
-			# agent.x = max(self.world_min_x, min(agent.x, self.world_max_x))
-			# agent.y = max(self.world_min_y, min(agent.y, self.world_max_y))
-		
-		# Physics
-		self.space.step(1)
-		
-		for agent in self.agents:
-			position = self.other_bodies[agent].body.position
-
-			agent.x = position.x
-			agent.y = position.y
-			# agent.x = max(self.world_min_x, min(agent.x, self.world_max_x))
-			# agent.y = max(self.world_min_y, min(agent.y, self.world_max_y))
 
 			agent.p_x = agent.x
 			agent.p_y = agent.y
+			
+			agent.x = max(self.world_min_x, min(agent.x, self.world_max_x))
+			agent.y = max(self.world_min_y, min(agent.y, self.world_max_y))
+		
+		# Physics
+		
+		for agent in self.agents:
+			agent.p_x = agent.x
+			agent.p_y = agent.y
+
+			agent.x = max(self.world_min_x, min(agent.x, self.world_max_x))
+			agent.y = max(self.world_min_y, min(agent.y, self.world_max_y))
+
+			self.quadtree.update(agent.circle)
+
+			# TODO: here's the point to do raycasts for vision
+		
+		collisions = self.quadtree.getCollisions()
+		# TODO: do stuff with collisions
+
+		
+		
 
 
 
