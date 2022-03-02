@@ -1,7 +1,12 @@
 import neat
+import math
 
 
-# TODO: different chromosomes will have different expected input/output counts. that's not accounted for here
+# HARDCODE EVERYTHING YEEEEHAAAW
+CELL_STATE_LENGTH = 7
+ID_VECTOR_LENGTH = 4
+
+
 class LSTMGenome(DefaultGenome):
     """
     A genome for generalized neural networks.
@@ -89,17 +94,17 @@ class LSTMGenome(DefaultGenome):
 
 from neat.nn import FeedForwardNetwork
 
-CELL_STATE_LENGTH = 10
 class LSTM(object):
 
-    def __init__(self, inputs, outputs, node_evals):
+    def __init__(self, inputs, outputs, node_evals, CELL_STATE_LENGTH=10):
         # self.input_nodes = inputs
         # self.output_nodes = outputs
         # self.node_evals = node_evals
         # self.values = dict((key, 0.0) for key in inputs + outputs)
 
+        self.CELL_STATE_LENGTH = CELL_STATE_LENGTH
 		self.nn_layers = [] # array of FeedForwardNetwork objects
-		self.cell_state = [0]*CELL_STATE_LENGTH # TODO: CELL_STATE_LENGTH should be a parameter passed that gets read from the config
+		self.cell_state = [0]*self.CELL_STATE_LENGTH # TODO: CELL_STATE_LENGTH should be a parameter passed that gets read from the config
 		self.previous_output = [0]*len(outputs)
 
     def activate(self, inputs):
@@ -118,21 +123,21 @@ class LSTM(object):
 
         # return [self.values[i] for i in self.output_nodes]
 
-		# TODO: this
+        inputs = inputs + self.last_output
 
 		def forget_gate(cell_state):
-			gate_output = self.nn_layers[0].activate(self.previous_output + inputs)
+			gate_output = self.nn_layers[0].activate(self.previous_output + inputs)     # sigmoid
 			return [cell * gate_out for cell, gate_out in zip(cell_state, gate_output)]
 
 		def replace_new_gate(cell_state):
-			replace_gate_output = self.nn_layers[1].activate(self.previous_output + inputs)
-			new_gate_output = self.nn_layers[2].activate(self.previous_output + inputs)
+			replace_gate_output = self.nn_layers[1].activate(self.previous_output + inputs) # sigmoid
+			new_gate_output = self.nn_layers[2].activate(self.previous_output + inputs)     # tanh
 
 			return [cell + rep*new for cell, rep, new in zip(cell_state, replace_gate_output, new_gate_output)]
 
 		def output_gate(cell_state):
-			hide_state_output = self.nn_layers[3].activate(self.previous_output + inputs)
-			transform_state_output = self.nn_layers[4].activate(cell_state)
+			hide_state_output = self.nn_layers[3].activate(self.previous_output + inputs)   # sigmoid
+			transform_state_output = self.nn_layers[4].activate(cell_state)                 # tanh
 
 			return [hide*trans for hide, trans in zip(hide_state_output, transform_state_output)]
 
@@ -140,7 +145,8 @@ class LSTM(object):
 		self.cell_state = forget_gate(self.cell_state)
 		self.cell_state = replace_new_gate(self.cell_state)
 
-		return output_gate(self.cell_state)
+		self.last_output = output_gate(self.cell_state)
+        return self.last_output
 		
 
 		
@@ -151,8 +157,48 @@ class LSTM(object):
     def create(genome, config):
         """ Receives a genome and returns its phenotype (an LSTM). """
 
-		# TODO: different chromosomes will have different expected input/output counts. that's not accounted for here
-		nn_layers = [FeedForwardNetwork.create(chromo, config) for chromo in genome.chromosomes]
+        # HARDCODE EVERYTHING YEEEEHAAAW
+
+        num_top_level_inputs = len(config.input_keys) # the number of inputs the LSTM appears to have to outside observers
+        num_top_level_outputs = len(config.output_keys) # the number of outputs the LSTM appears to have to outside observers
+        internal_num_inputs = num_top_level_inputs + num_top_level_outputs # the number of inputs after secretly concatenating extra values to the outsiders' given input
+
+        layer_details = [
+            ('sigmoid', internal_num_inputs, CELL_STATE_LENGTH), # cell state managers
+            ('sigmoid', internal_num_inputs, CELL_STATE_LENGTH),
+            ('tanh', internal_num_inputs, CELL_STATE_LENGTH),
+
+            ('sigmoid', internal_num_inputs, num_top_level_outputs), # outputters
+            ('tanh', CELL_STATE_LENGTH, num_top_level_outputs)
+        ]
+
+        return LSTM.create_given_layer_details(genome, config, layer_details)
+
+
+    @staticmethod
+    def create_given_layer_details(genome, config, layer_details):
+        """ Receives a genome and returns its phenotype (an LSTM). """
+
+        nn_layers = []
+
+        old__config__genome_config__activation_defs__get = config.genome_config.activation_defs.get
+        old__config__input_keys = config.input_keys
+        old__config__output_keys = config.output_keys
+        for chromo, (activation, num_inputs, num_outputs) in zip(genome.chromosomes, layer_details):
+            # I am very not happy with this, but it gets the job done
+            config.genome_config.activation_defs.get = lambda _: old__config__genome_config__activation_defs__get(activation)
+            
+            config.input_keys = [-i - 1 for i in range(num_inputs)] # ripped straight out of https://github.com/CodeReclaimers/neat-python/blob/c2b79c88667a1798bfe33c00dd8e251ef8be41fa/neat/genome.py
+            config.output_keys = [i for i in range(num_outputs)]
+
+
+            layer = FeedForwardNetwork.create(chromo, config)
+            nn_layers.push(layer)
+
+        config.genome_config.activation_defs.get = old__config__genome_config__activation_defs__get
+        config.input_keys = old__config__input_keys    # return config.input_keys/output_keys to the values an outside observer to the LSTM would expect
+        config.output_keys = old__config__output_keys         
+
         return LSTM(config.genome_config.input_keys, config.genome_config.output_keys, nn_layers)
 
 
@@ -161,34 +207,103 @@ class LSTM(object):
 
 
 
+class LSTM_WithMemory(LSTM):
+    
+    MEMORY_IMPORTANCE_THRESHOLD = 0.5
+    ID_TAG_RANGE = 256
+    # IMPORTANCE_SCALING = 10
+
+    def __init__(self, *args,**kwargs):
+        LSTM.__init__(self, *args,**kwargs)
+        self.memories = MemoryDB(idVectorLen=ID_VECTOR_LENGTH)
+
+
+    # STEPS:
+    # 1. Get the id vector and importance the current cell state would have if it were to become a memory
+    # 2. Look up memories relevant to that id vector
+    # 3. If the current cell state's importance (given by the first element of its id vector) is high enough, store it for future lookups
+    # 4. process the relevant memories into a context vector by doing a weighted sum according to thier relative importances ( context_vector = vector_sum(memory.memory * (memory.importance / total_importance) for memory in lookup_results) )
+    # 5. feed this into the main LSTM along with the regular inputs
+    def activate(self, inputs):
+        # 1
+        memory_identifier = self.nn_layers[5] # sigmoid
+        raw_id_vector = memory_identifier.activate(self.cell_state)
+        cell_state_importance = raw_id_vector[0]
+        id_vector = [int(id_tag*self.ID_TAG_RANGE) for id_tag in raw_id_vector[1:]]
+
+        # 2
+        relevant_memories = self.memories.lookup(id_vector)
+
+        # 3
+        if cell_state_importance >= self.MEMORY_IMPORTANCE_THRESHOLD:
+            self.memories.storeMemory(self.cell_state, id_vector)
+
+        # 4
+        total_importance = sum(importance for (memory, importance) in relevant_memories)
+        scaled_memories = [tuple(element * importance/total_importance for element in memory) for (memory, importance) in relevant_memories]
+        context_vector = tuple(sum(element_values) for element_values in zip(*scaled_memories)) # note: zip(*array) is a transpose operation
+
+        # 5
+        lstm_output = LSTM.activate(self, inputs+context_vector)
+
+        return lstm_output
+
+    
+
+    @staticmethod
+    def create(genome, config):
+        """ Receives a genome and returns its phenotype (an LSTM). """
+
+        # HARDCODE EVERYTHING YEEEEHAAAW
+
+        num_top_level_inputs = len(config.input_keys) # the number of inputs the LSTM appears to have to outside observers
+        num_top_level_outputs = len(config.output_keys) # the number of outputs the LSTM appears to have to outside observers
+        internal_num_inputs = num_top_level_inputs + num_top_level_outputs # the number of inputs after secretly concatenating extra values to the outsiders' given input
+
+        layer_details = [
+            ('sigmoid', internal_num_inputs, CELL_STATE_LENGTH), # cell state managers
+            ('sigmoid', internal_num_inputs, CELL_STATE_LENGTH),
+            ('tanh', internal_num_inputs, CELL_STATE_LENGTH),
+
+            ('sigmoid', internal_num_inputs, num_top_level_outputs), # outputters
+            ('tanh', CELL_STATE_LENGTH, num_top_level_outputs),
+
+            ('sigmoid', CELL_STATE_LENGTH, ID_VECTOR_LENGTH+1), # id vector labeller / memory manager # +1 for also outputting importance
+        ]
+
+        return LSTM.create_given_layer_details(genome, config, layer_details)
+
+
 
 
 # not technically part of an LSTM, but required for my implementation
 class MemoryDB:
     allMemories = list()
     memoryLookup = list() # of form: [idIndex: { idValue1: {memories}, idValue2: {memories}, ... }, ...]
+                          # where `memories` is of form `(memory, importance), ...`
 
     idVectorLen = None
     maxNumMemories = 100
 
-    numMemoriesReturnedByLookup = 5
+    numMemoriesReturnedByLookup = None
 
-    def __init__(self, idVectorLen = 10):
+    def __init__(self, idVectorLen = 10, numMemoriesReturnedByLookup = 5):
         self.idVectorLen = idVectorLen
+        self.numMemoriesReturnedByLookup = numMemoriesReturnedByLookup
 
         for i in range(idVectorLen):
             self.memoryLookup.append(dict())
 
 
-    def addMemory(memory, idVector):
-        self.allMemories.append((memory, idVector))
+    def storeMemory(memory, idVector, importance):
+        self.allMemories.append((memory, idVector, importance))
 
         for i, tag in zip(range(self.idVectorLen), idVector):
             if memoryLookup[i][tag] == None:
                 memoryLookup[i][tag] = set()
-            memoryLookup[i][tag].add(memory)
+            memoryLookup[i][tag].add((memory, importance))
 
-        # if we have too many memories, remove them
+        # if we have too many memories, remove the oldest as extras
         if len(self.allMemories) > self.maxNumMemories:
             (memToRemove, idVecToRemove) = self.allMemories.pop(0)
             
