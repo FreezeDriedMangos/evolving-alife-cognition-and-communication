@@ -63,6 +63,9 @@ class LSTMGenome(neat.DefaultGenome):
     def configure_crossover(self, genome1, genome2, config):
         """ Configure a new genome by crossover from two parent genomes. """
         [chromo.configure_crossover(parentChromo1, parentChromo2, config) for chromo in self.chromosomes for (parentChromo1, parentChromo2) in zip(genome1.chromosomes, genome2.chromosomes)]
+        
+        if hasattr(genome1, 'memories') and hasattr(genome2, 'memories'):
+            self.memories = MemoryDB.create(genome1.memories, genome2.memories)
 
     def mutate(self, config):
         """ Mutates this genome. """
@@ -103,15 +106,15 @@ from neat.nn import FeedForwardNetwork
 
 class LSTM(object):
 
-    def __init__(self, inputs, outputs, nn_layers, CELL_STATE_LENGTH=10):
+    def __init__(self, inputs, outputs, nn_layers, cell_state_len=CELL_STATE_LENGTH):
         # self.input_nodes = inputs
         # self.output_nodes = outputs
         # self.node_evals = node_evals
         # self.values = dict((key, 0.0) for key in inputs + outputs)
 
-        self.CELL_STATE_LENGTH = CELL_STATE_LENGTH
+        self.cell_state_len = cell_state_len
         self.nn_layers = nn_layers # array of FeedForwardNetwork objects
-        self.cell_state = [0]*self.CELL_STATE_LENGTH # TODO: CELL_STATE_LENGTH should be a parameter passed that gets read from the config
+        self.cell_state = [0]*self.cell_state_len # TODO: cell_state_len should be a parameter passed that gets read from the config
         # self.previous_output = [0]*len(outputs)
 
         self.num_inputs = len(inputs)
@@ -187,8 +190,10 @@ class LSTM(object):
 
 
     @staticmethod
-    def create_given_layer_details(genome, config, layer_details):
+    def create_given_layer_details(genome, config, layer_details, constructor=None):
         """ Receives a genome and returns its phenotype (an LSTM). """
+        if constructor == None:
+            constructor = LSTM
 
         nn_layers = []
 
@@ -216,7 +221,7 @@ class LSTM(object):
         config.num_inputs = old__config__num_inputs
         config.num_outputs = old__config__num_outputs       
 
-        return LSTM(config.genome_config.input_keys, config.genome_config.output_keys, nn_layers)
+        return constructor(config.genome_config.input_keys, config.genome_config.output_keys, nn_layers)
 
 
 
@@ -288,7 +293,13 @@ class LSTM_WithMemory(LSTM):
             ('sigmoid', CELL_STATE_LENGTH, ID_VECTOR_LENGTH+1), # id vector labeller / memory manager # +1 for also outputting importance
         ]
 
-        return LSTM.create_given_layer_details(genome, config, layer_details)
+        lstm = LSTM.create_given_layer_details(genome, config, layer_details, constructor=LSTM_WithMemory)
+        if hasattr(genome, 'memories'):
+            lstm.memories = genome.memories
+        else:
+            genome.memories = lstm.memories
+
+        return lstm
 
 
 
@@ -311,8 +322,22 @@ class MemoryDB:
         for i in range(idVectorLen):
             self.memoryLookup.append(dict())
 
+    @staticmethod
+    def reproduce(p1, p2):
+        new = MemoryDB()
+        new.maxNumMemories = p1.maxNumMemories
+        new.idVectorLen = p1.idVectorLen
+        new.numMemoriesReturnedByLookup = p1.numMemoriesReturnedByLookup
 
-    def storeMemory(memory, idVector, importance):
+        parents_memories_interleaved = [mem for pair in zip(p1.allMemories, p2.allMemories) for mem in pair] 
+        starting_memories = parents_memories_interleaved[0:new.maxNumMemories]
+        
+        [new.storeMemory(*mem) for mem in starting_memories]
+
+        return new
+
+
+    def storeMemory(self, memory, idVector, importance):
         self.allMemories.append((memory, idVector, importance))
 
         for i, tag in zip(range(self.idVectorLen), idVector):
@@ -327,7 +352,7 @@ class MemoryDB:
             for i, tag in zip(range(self.idVectorLen), idVecToRemove):
                 memoryLookup[i][tag].remove(memToRemove)
 
-    def lookup(idVector):
+    def lookup(self, idVector):
         memoriesByScore = {} # {score: [memory]}
 
         retval = []
