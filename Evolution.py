@@ -61,7 +61,8 @@ def eval_genomes(genomes, config):
     world.update_walls(int((generation_number*WALL_CHANGE_SPEED)**2))
 
     # simulate
-    world.init_agents([agent for (genome_id, genome, agent) in grandparents+parents+cur_gen]) # skips agents that are dead
+    # world.init_agents([agent for (genome_id, genome, agent) in grandparents+parents+cur_gen]) # skips agents that are dead
+    world.init_agents([agent for (genome_id, genome, agent) in cur_gen]) # skips agents that are dead
     for i in range(min(10000, 100 + int((generation_number*GEN_TIMER_CHANGE_SPEED)**2))): # simulate 10,000 'seconds'
         world.iteration()
         GUI.draw(world)
