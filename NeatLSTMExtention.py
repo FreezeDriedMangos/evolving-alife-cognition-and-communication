@@ -7,33 +7,33 @@ CELL_STATE_LENGTH = 7
 ID_VECTOR_LENGTH = 4
 
 
-class LSTMGenome(DefaultGenome):
+class LSTMGenome(neat.DefaultGenome):
     """
     A genome for generalized neural networks.
     Terminology
         pin: Point at which the network is conceptually connected to the external world;
-             pins are either input or output.
+            pins are either input or output.
         node: Analog of a physical neuron.
         connection: Connection between a pin/node output and a node's input, or between a node's
-             output and a pin/node input.
+            output and a pin/node input.
         key: Identifier for an object, unique within the set of similar objects.
     Design assumptions and conventions.
         1. Each output pin is connected only to the output of its own unique
-           neuron by an implicit connection with weight one. This connection
-           is permanently enabled.
+        neuron by an implicit connection with weight one. This connection
+        is permanently enabled.
         2. The output pin's key is always the same as the key for its
-           associated neuron.
+        associated neuron.
         3. Output neurons can be modified but not deleted.
         4. The input values are applied to the input pins unmodified.
     """
 
-	chromosomes = []
+    chromosomes = []
 
     @classmethod
     def parse_config(cls, param_dict):
-        param_dict['node_gene_type'] = DefaultNodeGene
-        param_dict['connection_gene_type'] = DefaultConnectionGene
-        return DefaultGenomeConfig(param_dict)
+        param_dict['node_gene_type'] = neat.genes.DefaultNodeGene
+        param_dict['connection_gene_type'] = neat.genes.DefaultConnectionGene
+        return neat.genome.DefaultGenomeConfig(param_dict)
 
     @classmethod
     def write_config(cls, f, config):
@@ -44,14 +44,21 @@ class LSTMGenome(DefaultGenome):
         self.key = key
 
         # Custom setup
-		nnLayers = [DefaultGenome(key), DefaultGenome(key)] # TODO: how many chromosomes will there be?
+        self.chromosomes = [
+            neat.DefaultGenome(key), 
+            neat.DefaultGenome(key), 
+            neat.DefaultGenome(key), 
+            neat.DefaultGenome(key), 
+            neat.DefaultGenome(key), 
+            neat.DefaultGenome(key) # this one only used for LSTM_WithMemory
+        ] # TODO: how many chromosomes will there be?
 
         # Fitness results.
         self.fitness = None
 
     def configure_new(self, config):
         """Configure a new genome based on the given configuration."""
-		[chromo.configure_new(config) for chromo in self.chromosomes]
+        [chromo.configure_new(config) for chromo in self.chromosomes]
 
     def configure_crossover(self, genome1, genome2, config):
         """ Configure a new genome by crossover from two parent genomes. """
@@ -59,7 +66,7 @@ class LSTMGenome(DefaultGenome):
 
     def mutate(self, config):
         """ Mutates this genome. """
-		[chromo.mutate(config) for chromo in self.chromosomes]
+        [chromo.mutate(config) for chromo in self.chromosomes]
 
     def distance(self, other, config):
         """
@@ -67,8 +74,8 @@ class LSTMGenome(DefaultGenome):
         is used to compute genome compatibility for speciation.
         """
 
-		# return the average distance between all chromosomes
-		return sum(chromo.distance(otherChromo, config) for chromo, otherChromo in zip(self.chromosomes, other.chromosomes)) / len(self.chromosomes)
+        # return the average distance between all chromosomes
+        return sum(chromo.distance(otherChromo, config) for chromo, otherChromo in zip(self.chromosomes, other.chromosomes)) / len(self.chromosomes)
 
     def size(self):
         """
@@ -76,19 +83,19 @@ class LSTMGenome(DefaultGenome):
         (number of nodes, number of enabled connections)
         """
 
-		# return the average complexity of all chromosomes
+        # return the average complexity of all chromosomes
         complexities = [chromo.size() for chromo in self.chromosomes] # [(Nnodes1, Nconn1), (Nnodes2, Nconn2), ...]
-		complexitiesT = [[comp[j][i] for j in range(len(complexities))] for i in range(len(complexities[0]))] # [[Nnodes1, Nnodes2, ...], [Nconn1, Nconn2, ...]]
+        complexitiesT = [[complexities[j][i] for j in range(len(complexities))] for i in range(len(complexities[0]))] # [[Nnodes1, Nnodes2, ...], [Nconn1, Nconn2, ...]]
 
-		averageComplexities = [sum(factor) / len(factor) for factor in complexitiesT]
-		return averageComplexities
+        averageComplexities = [sum(factor) / len(factor) for factor in complexitiesT]
+        return averageComplexities
 
     def __str__(self):
         s = "Key: {0}\nFitness: {1}\nChromosomes:\n".format(self.key, self.fitness)
         chromosomeStrings = ['\t' + chromo.__str__().replace('\n', '\n\t') for chromo in self.chromosomes]
-		numberedChromosomeStrings = ['('+i+')'+st for st, i in zip(chromosomeStrings, range(len(chromosomeStrings)))]
+        numberedChromosomeStrings = ['('+i+')'+st for st, i in zip(chromosomeStrings, range(len(chromosomeStrings)))]
 
-		return s + '\n'.join(numberedChromosomeStrings)
+        return s + '\n'.join(numberedChromosomeStrings)
 
 
 
@@ -96,19 +103,23 @@ from neat.nn import FeedForwardNetwork
 
 class LSTM(object):
 
-    def __init__(self, inputs, outputs, node_evals, CELL_STATE_LENGTH=10):
+    def __init__(self, inputs, outputs, nn_layers, CELL_STATE_LENGTH=10):
         # self.input_nodes = inputs
         # self.output_nodes = outputs
         # self.node_evals = node_evals
         # self.values = dict((key, 0.0) for key in inputs + outputs)
 
         self.CELL_STATE_LENGTH = CELL_STATE_LENGTH
-		self.nn_layers = [] # array of FeedForwardNetwork objects
-		self.cell_state = [0]*self.CELL_STATE_LENGTH # TODO: CELL_STATE_LENGTH should be a parameter passed that gets read from the config
-		self.previous_output = [0]*len(outputs)
+        self.nn_layers = nn_layers # array of FeedForwardNetwork objects
+        self.cell_state = [0]*self.CELL_STATE_LENGTH # TODO: CELL_STATE_LENGTH should be a parameter passed that gets read from the config
+        # self.previous_output = [0]*len(outputs)
+
+        self.num_inputs = len(inputs)
+        self.num_outputs = len(outputs)
+        self.last_output = [0]*self.num_outputs
 
     def activate(self, inputs):
-        if len(self.input_nodes) != len(inputs):
+        if self.num_inputs != len(inputs):
             raise RuntimeError("Expected {0:n} inputs, got {1:n}".format(len(self.input_nodes), len(inputs)))
 
         # for k, v in zip(self.input_nodes, inputs):
@@ -125,31 +136,31 @@ class LSTM(object):
 
         inputs = inputs + self.last_output
 
-		def forget_gate(cell_state):
-			gate_output = self.nn_layers[0].activate(self.previous_output + inputs)     # sigmoid
-			return [cell * gate_out for cell, gate_out in zip(cell_state, gate_output)]
+        def forget_gate(cell_state):
+            gate_output = self.nn_layers[0].activate(inputs)     # sigmoid
+            return [cell * gate_out for cell, gate_out in zip(cell_state, gate_output)]
 
-		def replace_new_gate(cell_state):
-			replace_gate_output = self.nn_layers[1].activate(self.previous_output + inputs) # sigmoid
-			new_gate_output = self.nn_layers[2].activate(self.previous_output + inputs)     # tanh
+        def replace_new_gate(cell_state):
+            replace_gate_output = self.nn_layers[1].activate(inputs) # sigmoid
+            new_gate_output = self.nn_layers[2].activate(inputs)     # tanh
 
-			return [cell + rep*new for cell, rep, new in zip(cell_state, replace_gate_output, new_gate_output)]
+            return [cell + rep*new for cell, rep, new in zip(cell_state, replace_gate_output, new_gate_output)]
 
-		def output_gate(cell_state):
-			hide_state_output = self.nn_layers[3].activate(self.previous_output + inputs)   # sigmoid
-			transform_state_output = self.nn_layers[4].activate(cell_state)                 # tanh
+        def output_gate(cell_state):
+            hide_state_output = self.nn_layers[3].activate(inputs)   # sigmoid
+            transform_state_output = self.nn_layers[4].activate(cell_state)                 # tanh
 
-			return [hide*trans for hide, trans in zip(hide_state_output, transform_state_output)]
+            return [hide*trans for hide, trans in zip(hide_state_output, transform_state_output)]
 
 
-		self.cell_state = forget_gate(self.cell_state)
-		self.cell_state = replace_new_gate(self.cell_state)
+        self.cell_state = forget_gate(self.cell_state)
+        self.cell_state = replace_new_gate(self.cell_state)
 
-		self.last_output = output_gate(self.cell_state)
+        self.last_output = output_gate(self.cell_state)
         return self.last_output
-		
+        
 
-		
+        
 
 
 
@@ -159,8 +170,8 @@ class LSTM(object):
 
         # HARDCODE EVERYTHING YEEEEHAAAW
 
-        num_top_level_inputs = len(config.input_keys) # the number of inputs the LSTM appears to have to outside observers
-        num_top_level_outputs = len(config.output_keys) # the number of outputs the LSTM appears to have to outside observers
+        num_top_level_inputs = config.num_inputs # the number of inputs the LSTM appears to have to outside observers
+        num_top_level_outputs = config.num_outputs # the number of outputs the LSTM appears to have to outside observers
         internal_num_inputs = num_top_level_inputs + num_top_level_outputs # the number of inputs after secretly concatenating extra values to the outsiders' given input
 
         layer_details = [
@@ -182,22 +193,28 @@ class LSTM(object):
         nn_layers = []
 
         old__config__genome_config__activation_defs__get = config.genome_config.activation_defs.get
-        old__config__input_keys = config.input_keys
-        old__config__output_keys = config.output_keys
+        old__config__input_keys = config.genome_config.input_keys if hasattr(config.genome_config, 'input_keys') else None
+        old__config__output_keys = config.genome_config.output_keys if hasattr(config.genome_config, 'output_keys') else None
+        old__config__num_inputs = config.num_inputs if hasattr(config, 'num_inputs') else None
+        old__config__num_outputs = config.num_outputs if hasattr(config, 'num_outputs') else None
         for chromo, (activation, num_inputs, num_outputs) in zip(genome.chromosomes, layer_details):
             # I am very not happy with this, but it gets the job done
             config.genome_config.activation_defs.get = lambda _: old__config__genome_config__activation_defs__get(activation)
             
-            config.input_keys = [-i - 1 for i in range(num_inputs)] # ripped straight out of https://github.com/CodeReclaimers/neat-python/blob/c2b79c88667a1798bfe33c00dd8e251ef8be41fa/neat/genome.py
-            config.output_keys = [i for i in range(num_outputs)]
+            config.genome_config.input_keys = [-i - 1 for i in range(num_inputs)] # ripped straight out of https://github.com/CodeReclaimers/neat-python/blob/c2b79c88667a1798bfe33c00dd8e251ef8be41fa/neat/genome.py
+            config.genome_config.output_keys = [i for i in range(num_outputs)]
 
+            config.num_inputs = num_inputs
+            config.num_outputs = num_outputs
 
             layer = FeedForwardNetwork.create(chromo, config)
-            nn_layers.push(layer)
+            nn_layers.append(layer)
 
         config.genome_config.activation_defs.get = old__config__genome_config__activation_defs__get
-        config.input_keys = old__config__input_keys    # return config.input_keys/output_keys to the values an outside observer to the LSTM would expect
-        config.output_keys = old__config__output_keys         
+        config.genome_config.input_keys = old__config__input_keys    # return config.input_keys/output_keys to the values an outside observer to the LSTM would expect
+        config.genome_config.output_keys = old__config__output_keys  
+        config.num_inputs = old__config__num_inputs
+        config.num_outputs = old__config__num_outputs       
 
         return LSTM(config.genome_config.input_keys, config.genome_config.output_keys, nn_layers)
 
@@ -256,8 +273,8 @@ class LSTM_WithMemory(LSTM):
 
         # HARDCODE EVERYTHING YEEEEHAAAW
 
-        num_top_level_inputs = len(config.input_keys) # the number of inputs the LSTM appears to have to outside observers
-        num_top_level_outputs = len(config.output_keys) # the number of outputs the LSTM appears to have to outside observers
+        num_top_level_inputs = config.genome_config.num_inputs # the number of inputs the LSTM appears to have to outside observers
+        num_top_level_outputs = config.genome_config.num_outputs # the number of outputs the LSTM appears to have to outside observers
         internal_num_inputs = num_top_level_inputs + num_top_level_outputs # the number of inputs after secretly concatenating extra values to the outsiders' given input
 
         layer_details = [
@@ -280,7 +297,7 @@ class LSTM_WithMemory(LSTM):
 class MemoryDB:
     allMemories = list()
     memoryLookup = list() # of form: [idIndex: { idValue1: {memories}, idValue2: {memories}, ... }, ...]
-                          # where `memories` is of form `(memory, importance), ...`
+                        # where `memories` is of form `(memory, importance), ...`
 
     idVectorLen = None
     maxNumMemories = 100
@@ -355,7 +372,7 @@ class MemoryDB:
 
         #  there just straight up aren't enough memories of score 1 or greater to fill an array of len NUM_MEMORIES_RETURNED
         return retval
-	
+    
 
 def smallestCollection(collections, ignoreCondition = lambda collection: False):
     smallestLen = None

@@ -6,6 +6,7 @@ import visualize
 import Agent
 import World
 import GUI
+import NeatLSTMExtention
 
 WALL_CHANGE_SPEED = 0.5
 GEN_TIMER_CHANGE_SPEED = 0.25
@@ -51,7 +52,8 @@ def eval_genomes(genomes, config):
 
     for genome_id, genome in genomes:
         genome.fitness = 0
-        net = neat.nn.recurrent.RecurrentNetwork.create(genome, config) # TODO: in order to generate LSTMs instead, just do LSTM.create(genome, config)
+        # net = neat.nn.recurrent.RecurrentNetwork.create(genome, config) # TODO: in order to generate LSTMs instead, just do LSTM.create(genome, config)
+        net = NeatLSTMExtention.LSTM_WithMemory.create(genome, config) # TODO: in order to generate LSTMs instead, just do LSTM.create(genome, config)
         agent = Agent.Agent(net, *[parent[2] for parent in parents if parent[0] in p.reproduction.ancestors[genome_id]])
 
         cur_gen.append((genome_id, genome, agent))
@@ -79,9 +81,14 @@ def eval_genomes(genomes, config):
 def run(config_file):
     # Load configuration.
     # TODO: to enable LSTM evolution, replace neat.DefaultGenome with LSTMGenome
-    config = neat.Config(neat.DefaultGenome, neat.DefaultReproduction,
-                         neat.DefaultSpeciesSet, neat.DefaultStagnation,
-                         config_file)
+    # config = neat.Config(neat.DefaultGenome, neat.DefaultReproduction,
+    #                      neat.DefaultSpeciesSet, neat.DefaultStagnation,
+    #                      config_file)
+
+    config = neat.Config(NeatLSTMExtention.LSTMGenome, neat.DefaultReproduction,
+                        neat.DefaultSpeciesSet, neat.DefaultStagnation,
+                        config_file)
+
 
     global world
     world = World.World()
@@ -127,5 +134,5 @@ if __name__ == '__main__':
     # here so that the script will run successfully regardless of the
     # current working directory.
     local_dir = os.path.dirname(__file__)
-    config_path = os.path.join(local_dir, 'config-feedforward')
+    config_path = os.path.join(local_dir, 'config-lstm-memory')
     run(config_path)
