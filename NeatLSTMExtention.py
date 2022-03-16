@@ -62,10 +62,10 @@ class LSTMGenome(neat.DefaultGenome):
 
     def configure_crossover(self, genome1, genome2, config):
         """ Configure a new genome by crossover from two parent genomes. """
-        [chromo.configure_crossover(parentChromo1, parentChromo2, config) for chromo in self.chromosomes for (parentChromo1, parentChromo2) in zip(genome1.chromosomes, genome2.chromosomes)]
+        [chromo.configure_crossover(parentChromo1, parentChromo2, config) for (chromo, parentChromo1, parentChromo2) in zip(self.chromosomes, genome1.chromosomes, genome2.chromosomes)]
         
         if hasattr(genome1, 'memories') and hasattr(genome2, 'memories'):
-            self.memories = MemoryDB.create(genome1.memories, genome2.memories)
+            self.memories = MemoryDB.reproduce(genome1.memories, genome2.memories)
 
     def mutate(self, config):
         """ Mutates this genome. """
@@ -263,10 +263,10 @@ class LSTM_WithMemory(LSTM):
         # 4
         total_importance = sum(importance for (memory, importance) in relevant_memories)
         scaled_memories = [tuple(element * importance/total_importance for element in memory) for (memory, importance) in relevant_memories]
-        context_vector = tuple(sum(element_values) for element_values in zip(*scaled_memories)) # note: zip(*array) is a transpose operation
+        context_vector = list(sum(element_values) for element_values in zip(*scaled_memories)) # note: zip(*array) is a transpose operation
 
         # 5
-        lstm_output = LSTM.activate(self, inputs+context_vector)
+        lstm_output = LSTM.activate(self, inputs+list(context_vector))
 
         return lstm_output
 
@@ -358,7 +358,7 @@ class MemoryDB:
         retval = []
         memory_groups = [
                 self.memoryLookup[i][idVector[i]].copy() 
-                if self.memoryLookup[i][idVector[i]] != None 
+                if idVector[i] in self.memoryLookup[i] and self.memoryLookup[i][idVector[i]] != None 
                 else set() 
             for i in range(self.idVectorLen)
         ] # all memories that have at least one matching id tag, grouped by which tag matches

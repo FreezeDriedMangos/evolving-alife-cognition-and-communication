@@ -76,6 +76,9 @@ def eval_genomes(genomes, config):
         # TODO: try (num_agents_in_species_still_alive / num_agents_in_species)
         # TODO: try (agent.max_age - agent.age) * (num_agents_in_species_still_alive / num_agents_in_species)
 
+        if hasattr(genome, 'chromosomes'):
+            for chromosome in genome.chromosomes:
+                chromosome.fitness = genome.fitness
     generation_number += 1
 
 
