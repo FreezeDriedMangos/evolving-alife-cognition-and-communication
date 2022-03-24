@@ -114,29 +114,77 @@ def run(config_file):
     print('\nBest genome:\n{!s}'.format(winner))
 
     # Show output of the most fit genome against training data.
-    print('\nOutput:')
-    winner_net = neat.nn.FeedForwardNetwork.create(winner, config)
-    for xi, xo in zip(xor_inputs, xor_outputs):
-        output = winner_net.activate(xi)
-        print("input {!r}, expected output {!r}, got {!r}".format(xi, xo, output))
+    # print('\nOutput:')
+    # winner_net = neat.nn.FeedForwardNetwork.create(winner, config)
+    # for xi, xo in zip(xor_inputs, xor_outputs):
+    #     output = winner_net.activate(xi)
+    #     print("input {!r}, expected output {!r}, got {!r}".format(xi, xo, output))
 
-    node_names = {-1:'A', -2: 'B', 0:'A XOR B'}
-    visualize.draw_net(config, winner, True, node_names=node_names)
-    visualize.plot_stats(stats, ylog=False, view=True)
-    visualize.plot_species(stats, view=True)
+    # node_names = {-1:'A', -2: 'B', 0:'A XOR B'}
+    # visualize.draw_net(config, winner, True, node_names=node_names)
+    # visualize.plot_stats(stats, ylog=False, view=True)
+    # visualize.plot_species(stats, view=True)
 
-    p = neat.Checkpointer.restore_checkpoint('neat-checkpoint-4')
-    p.run(eval_genomes, 10)
+    # p = neat.Checkpointer.restore_checkpoint('neat-checkpoint-4')
+    # p.run(eval_genomes, 10)
+
+    import pickle
+    pickle.dump(winner, open( "lastcompletedrundata/winner_genome.p", "wb" ) )
+    pickle.dump(config, open( "lastcompletedrundata/config.p", "wb" ) )
+    pickle.dump(stats,  open( "lastcompletedrundata/stats.p", "wb" ) )
+    
+
+    # print('\nOutput:')
+    # winner_net = NeatLSTMExtention.LSTM_WithMemory.create(winner, config)
+
+    # for chromosome in winner.chromosomes:
+    #     visualize.draw_net(config, chromosome, True)
+    # visualize.plot_stats(stats, ylog=False, view=True)
+    # visualize.plot_species(stats, view=True)
+
 
 
 if __name__ == '__main__':
-    GUI.init()
+    import sys
+    if len(sys.argv) >= 2 and sys.argv[1] == 'visualize':
+        #
+        #
+        # visualize previous run
+        #
+        #
+        import pickle
+        winner = pickle.load(open( "lastcompletedrundata/winner_genome.p", "rb" ) )
+        config = pickle.load(open( "lastcompletedrundata/config.p", "rb" ) )
+        stats  = pickle.load(open( "lastcompletedrundata/stats.p", "rb" ) )
+        
+        # why doesn't the below work?
+        import os
+        for f in os.listdir('./lastcompletedrundata/visualize'):
+            print(f)
+            os.remove(os.path.join('./lastcompletedrundata/visualize', f))
 
-    print("Num inputs: " + str(Agent.TOTAL_INPUT_COUNT))
-    print("Num outputs: " + str(Agent.TOTAL_OUTPUT_COUNT))
-    # Determine path to configuration file. This path manipulation is
-    # here so that the script will run successfully regardless of the
-    # current working directory.
-    local_dir = os.path.dirname(__file__)
-    config_path = os.path.join(local_dir, 'config-lstm-memory')
-    run(config_path)
+        print('\nOutput:')
+        winner_net = NeatLSTMExtention.LSTM_WithMemory.create(winner, config)
+
+        for i, chromosome in enumerate(winner.chromosomes):
+            visualize.draw_net(config, chromosome, True, filename='lastcompletedrundata/visualize/chromosome'+str(i)+'.gv.svg')
+        visualize.plot_stats(stats, ylog=False, view=True, filename='lastcompletedrundata/visualize/avg_fitness.svg')
+        visualize.plot_species(stats, view=True, filename='lastcompletedrundata/visualize/speciation.svg')
+
+    else:
+        #
+        #
+        # start new run
+        #
+        #
+
+        GUI.init()
+
+        print("Num inputs: " + str(Agent.TOTAL_INPUT_COUNT))
+        print("Num outputs: " + str(Agent.TOTAL_OUTPUT_COUNT))
+        # Determine path to configuration file. This path manipulation is
+        # here so that the script will run successfully regardless of the
+        # current working directory.
+        local_dir = os.path.dirname(__file__)
+        config_path = os.path.join(local_dir, 'config-lstm-memory')
+        run(config_path)
