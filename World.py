@@ -11,6 +11,9 @@ import libraries.perlin_numpy as perlin_numpy
 import Agent as agent_lib
 import QuadTree
 
+FOOD_VALUE = 200
+FOOD_RADIUS = 0.2
+
 class SoundWave:
 	def __init__(self, origin_x, origin_y, radius, original_volume):
 		self.origin_x = origin_x
@@ -42,6 +45,7 @@ class World:
 	def __init__(self):
 		self.sound_waves = []
 		self.agents = []
+		self.foods = []
 		self.world_min_x = 0 
 		self.world_min_y = 0 
 		self.world_max_x = 50 
@@ -80,12 +84,19 @@ class World:
 		self.agents = agents
 		self.quadtree = QuadTree.QuadTree(self.world_max_x-self.world_min_x, self.world_max_y-self.world_min_y)
 		
+		self.foods = []
+
 		for agent in agents:
 			circle = QuadTree.Circle(QuadTree.Point(agent.x, agent.y), agent_lib.AGENT_RADIUS)
 			circle.agent = agent
 			agent.circle = circle
 			self.quadtree.add(circle)
-		
+
+			food_circle = QuadTree.Circle(QuadTree.Point(agent.x, agent.y-agent_lib.AGENT_RADIUS*2-FOOD_RADIUS), FOOD_RADIUS)
+			food_circle.isFood = True
+			self.foods.append(food_circle)
+			self.quadtree.add(food_circle)
+
 
 	def iteration(self):
 		# I'm not using pygame.Clock.tick() because I don't care about syncing physics with framerate or real-life time in general
@@ -101,6 +112,7 @@ class World:
 
 		for agent in self.agents:
 			agent.evaluate(self)
+			agent.age += 1
 
 			agent.p_x = agent.x
 			agent.p_y = agent.y
@@ -117,6 +129,10 @@ class World:
 			agent.x = max(self.world_min_x, min(agent.x, self.world_max_x))
 			agent.y = max(self.world_min_y, min(agent.y, self.world_max_y))
 
+			agent.circle.origin.x = agent.x
+			agent.circle.origin.y = agent.y
+			
+
 			self.quadtree.update(agent.circle)
 
 			# TODO: here's the point to do raycasts for vision
@@ -124,6 +140,18 @@ class World:
 		collisions = self.quadtree.getCollisions()
 		# TODO: do stuff with collisions
 
+		for (obj1, obj2) in collisions:
+			if hasattr(obj2, 'isFood') and hasattr(obj1, 'agent'):
+				obj1, obj2 = obj2, obj1 # swap
+
+			if hasattr(obj1, 'isFood') and hasattr(obj2, 'agent'):
+				# food/agent collision
+				obj2.agent.max_age += FOOD_VALUE
+				continue
+
+			if hasattr(obj1, 'agent') and hasattr(obj2, 'agent'):
+				# elastic collision
+				continue
 		
 		
 
