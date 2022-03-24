@@ -35,8 +35,11 @@ def init():
 def draw(world):
 	screen.fill((255, 255, 255))
 
+	for food in world.foods:
+		pygame.draw.circle(screen, (100, 50, 10), (food.origin.x*scale, food.origin.y*scale), food.radius*scale)
+
 	for agent in world.agents:
-		pygame.draw.circle(screen, (100, 100, 100), (agent.x*scale, agent.y*scale), 1*scale)
+		pygame.draw.circle(screen, (100, 100, 100), (agent.circle.origin.x*scale, agent.circle.origin.y*scale), agent.circle.radius*scale)
 
 	for sound_wave in world.sound_waves:
 		volume = int(sound_wave.volume_at_distance(sound_wave.radius))
