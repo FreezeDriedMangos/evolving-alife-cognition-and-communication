@@ -96,7 +96,7 @@ class LSTMGenome(neat.DefaultGenome):
     def __str__(self):
         s = "Key: {0}\nFitness: {1}\nChromosomes:\n".format(self.key, self.fitness)
         chromosomeStrings = ['\t' + chromo.__str__().replace('\n', '\n\t') for chromo in self.chromosomes]
-        numberedChromosomeStrings = ['('+i+')'+st for st, i in zip(chromosomeStrings, range(len(chromosomeStrings)))]
+        numberedChromosomeStrings = ['('+str(i)+')'+st for st, i in zip(chromosomeStrings, range(len(chromosomeStrings)))]
 
         return s + '\n'.join(numberedChromosomeStrings)
 
