@@ -250,9 +250,18 @@ class Agent:
 
 		# eyes
 		# world.cast_ray(self.x+self.eye1_x_rel, self.y+self.eye1_y_rel, self.rotation+self.)
-		input_vector += [world.cast_ray(self.x+math.cos(self.rotation)*ray.rel_x, self.y+math.sin(self.rotation)*ray.rel_y, self.rotation+ray.dir) for eye in self.eyes for ray in eye.rays]
+		#input_vector += [world.cast_ray(self.x+math.cos(self.rotation)*ray.rel_x, self.y+math.sin(self.rotation)*ray.rel_y, self.rotation+ray.dir) for eye in self.eyes for ray in eye.rays]
+		
+		for ray in self.get_absolute_eye_rays(): 
+			result = world.quadtree.raycast(QuadTree.Ray( \
+				QuadTree.Vector(*ray.origin), \
+				QuadTree.Vector(*ray.direction), \
+			))
+			input_vector += [result.color]
 
-		input_vector += [world.hear(self.x+math.cos(self.rotation)*ear.rel_x, self.y+math.sin(self.rotation)*ear.rel_y) for ear in self.ears]
+		input_vector += [world.hear(*ear_loc) for ear_loc in self.get_absolute_ear_locations()]
+			
+
 
 		# world maintains list of sound waves (origin_x, origin_y, radius, original_volume)
 		# every iteration step, for every sound wave, radius += SPEED_OF_SOUND
@@ -289,3 +298,33 @@ class Agent:
 
 		# age
 		self.age += 1
+
+
+	def get_absolute_eye_rays(self):
+		absolute_rays = []
+
+		for eye in self.eyes:
+			for ray in eye.rays:
+				x = self.x + ray.rel_x*math.cos(self.rotation) - ray.rel_y*math.sin(self.rotation)  #self.x+math.cos(self.rotation)*ray.rel_x
+				y = self.y + ray.rel_x*math.sin(self.rotation) + ray.rel_y*math.cos(self.rotation)  #self.y+math.sin(self.rotation)*ear.rel_y
+				
+				angle_rad = ray.dir + self.rotation
+
+				absolute_rays.push({
+					"origin": (x, y)
+					"direction": (math.cos(angle_rad), math.sin(angle_rad))
+				})
+
+		return absolute_rays
+
+	def get_absolute_ear_locations(self):
+		absolute_ear_locations = []
+
+		for ear in self.ears:
+			x = self.x + ear.rel_x*math.cos(self.rotation) - ear.rel_y*math.sin(self.rotation)
+			y = self.y + ear.rel_x*math.sin(self.rotation) + ear.rel_y*math.cos(self.rotation)
+			
+			absolute_ear_locations.push((x, y))
+		
+		return absolute_ear_locations
+

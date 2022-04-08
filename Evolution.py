@@ -39,6 +39,30 @@ world = None
 #          (should this one also handle graph operations, should I have another precedesor to handle graph ops, or should I just toss graph ops?)
 
 
+
+
+
+
+# Things to add
+# 	1.	Challenges (can run a simulation with multiple challenges 
+#       active at once)
+#     	1.	Very simple initial challenge where food starts directly 
+#           in front of the creatures, then slowly moves to nearby random 
+#           locations
+#     	2.	Very fast Boids that take damage on collision and drop food on death
+#     	3.	Food types - each type has a random color, sound frequency, sound loudness, and nutritional value (may be negative). Occasionally randomize, but not too much, and not always all at once
+#     	4.	Random body attributes - strength, speed, and size. Also add ability to push food (probably implement as “eat food when a certain output is above 0.8)
+#     	5.	Food patches - distributed far away from eachother, and respawn food. Food transitions from having a very negative reward (and associated color/sound) to having a positive color/sound, and then back to negative. This transition is determined by absolute simulation time, not age of the food. Make sure creatures live long enough to experience multiple cycles (seasons).
+#     	6.	Non-evolving AI competitors - 
+#     	7.	Puzzle boxes, to kickstart language evolution. Spawn structures randomly around the map that contain large amounts of high quality food (to make them irresistible) but can only successfully be eaten if two creatures solve a puzzle/game where one has information that the other needs to use (like the bomb game)
+# 	2.	A better way to define challenges and transitions to harder versions - define multiple “keyframes” that are slowly transitioned to over a set number of generations when a keyframe-defined average fitness level is hit
+# 	3.	Force based collision system
+# 	4.	The reinforcement learning system - both the net that takes state vector and outputs reward, and the backpropogation + experience replay system
+# 	5.	
+
+
+
+
 def eval_genomes(genomes, config):
     # init
     global grandparents

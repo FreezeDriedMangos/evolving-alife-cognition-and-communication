@@ -70,7 +70,7 @@ class BoundingBox():
 
 class Ray():
 	def __init__(self, origin, direction):
-		self.dir_inv = tuple(1/dir for dir in direction)
+		self.dir_inv = Vector(1/dir.x, 1/dir.y)
 		self.direction = direction
 		self.origin = origin
 
