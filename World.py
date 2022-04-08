@@ -92,10 +92,10 @@ class World:
 			agent.circle = circle
 			self.quadtree.add(circle)
 
-			food_circle = QuadTree.Circle(QuadTree.Point(agent.x, agent.y-agent_lib.AGENT_RADIUS*2-FOOD_RADIUS), FOOD_RADIUS)
-			food_circle.isFood = True
-			self.foods.append(food_circle)
-			self.quadtree.add(food_circle)
+			# food_circle = QuadTree.Circle(QuadTree.Point(agent.x, agent.y-agent_lib.AGENT_RADIUS*2-FOOD_RADIUS), FOOD_RADIUS)
+			# food_circle.isFood = True
+			# self.foods.append(food_circle)
+			# self.quadtree.add(food_circle)
 
 
 	def iteration(self):
